@@ -1,0 +1,79 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSET_STORAGE_TOPIC: offsets
+      KAFKA_TRANSACTION_STATE_LOG_TOPIC: transactions
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  scala-spark:
+    build:
+      context: scala
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --class KafkaConsumer --master local[*] /app.jar"
+
+  python-spark:
+    build:
+      context: python
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --master local[*] /consumer.py"
+
+  java-spark:
+    build:
+      context: java
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --class KafkaConsumer --master local[*] /app.jar"
+
+  data-producer:
+    build:
+      context: producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; python /producer.py"
