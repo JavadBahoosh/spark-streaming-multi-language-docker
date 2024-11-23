@@ -48,7 +48,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --class KafkaConsumer --master local[*] /app.jar"
 
   python-spark:
     build:
@@ -58,7 +57,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --master local[*] /consumer.py"
 
   java-spark:
     build:
@@ -68,7 +66,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; while ! nc -z redis 6379; do sleep 1; done; spark-submit --class KafkaConsumer --master local[*] /app.jar"
 
   data-producer:
     build:
@@ -76,4 +73,3 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    command: bash -c "while ! nc -z kafka 9092; do sleep 1; done; python /producer.py"
